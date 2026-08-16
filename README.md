@@ -20,7 +20,7 @@ dsh plugin --profile web add "link:$PWD"
 npx --yes @deepseek-ai/dsh plugin --profile web add "link:$PWD"
 ```
 
-重启 DSH（或等补丁热加载），然后 **强制刷新浏览器**（⌘⇧R）。右下角应出现「进入书房」。
+重启 DSH（或等补丁热加载），然后 **强制刷新浏览器**（⌘⇧R）。右下角应出现「进入书房」。建议使用浅色模式。
 
 `lib/` 已经预构建，安装时不用编译，也不用再装 `three`。
 
