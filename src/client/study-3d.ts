@@ -103,15 +103,15 @@ const LIGHT = {
   sunColor: 0xfff2d8, sunIntensity: 1.55, lampIntensity: 0.35, lampEmissive: 0.35,
 }
 const DARK = {
-  wall: 0x2f2719, floor: 0x463723, ceiling: 0x2a2214, fog: 0x241d12,
-  sky: 0x18223a, sunDisc: 0xdfe8f5, frame: 0x6b5a44,
-  wood: 0x6b5233, woodDark: 0x54402c, shelfWood: 0x5f4a2e,
-  rug: 0x4d3f2c, rugInner: 0x5a4a36, pot: 0x6e4636, leaf: 0x4a6136,
-  sofa: 0x74462e, pillowA: 0x59634c, pillowB: 0x8a7a5c,
-  bedding: 0x7d6c50, blanket: 0x6b5638, celadon: 0x2f4a3a,
-  paper: 0xe9dec2, scrollGlow: 0.35,
-  hemiSky: 0x2a3348, hemiGround: 0x1a140c, hemiIntensity: 0.22,
-  sunColor: 0x9ab0d8, sunIntensity: 0.18, lampIntensity: 1.5, lampEmissive: 1.1,
+  wall: 0x6a593e, floor: 0x7a6446, ceiling: 0x584836, fog: 0x4c3e2e,
+  sky: 0x3a5068, sunDisc: 0xf2f6fb, frame: 0x94826a,
+  wood: 0x967854, woodDark: 0x7e6a4c, shelfWood: 0x8a704e,
+  rug: 0x78664c, rugInner: 0x867458, pot: 0x966850, leaf: 0x728858,
+  sofa: 0xa06e4c, pillowA: 0x829070, pillowB: 0xb4a484,
+  bedding: 0xa49476, blanket: 0x94805e, celadon: 0x507260,
+  paper: 0xf4eed8, scrollGlow: 0.55,
+  hemiSky: 0x6e7c94, hemiGround: 0x42382c, hemiIntensity: 0.62,
+  sunColor: 0xd0dcea, sunIntensity: 0.64, lampIntensity: 1.95, lampEmissive: 1.42,
 }
 type Palette = typeof LIGHT
 

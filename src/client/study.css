@@ -646,8 +646,8 @@ body[data-dsh-study] [data-dsh-study-ambience] {
 }
 body[data-dsh-study][data-ds-dark-theme] [data-dsh-study-ambience] {
   background:
-    radial-gradient(1200px 700px at 8% -6%, #d9b47c17, #0000 55%),
-    radial-gradient(140% 120% at 50% 55%, #0000 62%, #0000002e 100%);
+    radial-gradient(1200px 700px at 8% -6%, #e8c98a2a, #0000 58%),
+    radial-gradient(140% 120% at 50% 55%, #0000 78%, #0000000a 100%);
 }
 
 /* ---- 3D 书房容器（chrome DOM）：fixed 铺满视口、z-index:0 压在
