@@ -38,7 +38,7 @@ const LEAVES = 5
 const PLANKS = 6
 const ATLAS_N = 8
 
-type Aabb = { x0: number; x1: number; z0: number; z1: number }
+type Aabb = { x0: number; x1: number; z0: number; z1: number; y0?: number; y1?: number }
 
 const mulberry32 = (seed: number) => () => {
   seed |= 0
@@ -430,13 +430,15 @@ export function createOutsideWorld(): OutsideWorld {
   const [wx1] = toWorld(cabinX + 3, 0)
   const [, wz0] = toWorld(0, cabinZ - 3)
   const [, wz1] = toWorld(0, cabinZ + 3)
+  const cabinY0 = cabinH * BS
+  const cabinY1 = (cabinH + 6) * BS
   const solids: Aabb[] = [
-    { x0: wx0 - 0.25, x1: wx1 + 0.25, z0: wz0 - 0.25, z1: wz0 + 0.25 },
-    { x0: wx0 - 0.25, x1: wx0 + 0.25, z0: wz0 - 0.25, z1: wz1 + 0.25 },
-    { x0: wx1 - 0.25, x1: wx1 + 0.25, z0: wz0 - 0.25, z1: wz1 + 0.25 },
-    { x0: wx0 - 0.25, x1: doorWorldX - 0.78, z0: wz1 - 0.25, z1: wz1 + 0.25 },
-    { x0: doorWorldX + 0.78, x1: wx1 + 0.25, z0: wz1 - 0.25, z1: wz1 + 0.25 },
-    { x0: doorWorldX - 0.76, x1: doorWorldX + 0.76, z0: doorWorldZ - 0.14, z1: doorWorldZ + 0.14 },
+    { x0: wx0 - 0.25, x1: wx1 + 0.25, z0: wz0 - 0.25, z1: wz0 + 0.25, y0: cabinY0, y1: cabinY1 },
+    { x0: wx0 - 0.25, x1: wx0 + 0.25, z0: wz0 - 0.25, z1: wz1 + 0.25, y0: cabinY0, y1: cabinY1 },
+    { x0: wx1 - 0.25, x1: wx1 + 0.25, z0: wz0 - 0.25, z1: wz1 + 0.25, y0: cabinY0, y1: cabinY1 },
+    { x0: wx0 - 0.25, x1: doorWorldX - 0.78, z0: wz1 - 0.25, z1: wz1 + 0.25, y0: cabinY0, y1: cabinY1 },
+    { x0: doorWorldX + 0.78, x1: wx1 + 0.25, z0: wz1 - 0.25, z1: wz1 + 0.25, y0: cabinY0, y1: cabinY1 },
+    { x0: doorWorldX - 0.76, x1: doorWorldX + 0.76, z0: doorWorldZ - 0.14, z1: doorWorldZ + 0.14, y0: cabinY0, y1: cabinY0 + 2.2 },
   ]
 
   const isSolid = (x: number, y: number, z: number) => {
@@ -479,6 +481,11 @@ export function createOutsideWorld(): OutsideWorld {
     const nz = Math.min(box.z1, Math.max(box.z0, z))
     return (x - nx) * (x - nx) + (z - nz) * (z - nz) < BODY_R * BODY_R
   }
+  const solidHits = (x: number, footY: number, z: number, box: Aabb) => {
+    if (box.y0 !== undefined && footY + BODY_H <= box.y0) return false
+    if (box.y1 !== undefined && footY >= box.y1 - 1e-4) return false
+    return circleHits(x, z, box)
+  }
   const inWorldXZ = (x: number, z: number) => {
     const min = BS * 1.2
     const maxX = (W - 1.2) * BS
@@ -486,10 +493,10 @@ export function createOutsideWorld(): OutsideWorld {
     return x >= min && z >= min && x <= maxX && z <= maxZ
   }
   const voxelsHit = (x: number, footY: number, z: number) => {
-    const pad = 1e-4
+    const pad = 1e-3
     const x0 = Math.floor((x - BODY_R) / BS)
     const x1 = Math.floor((x + BODY_R - pad) / BS)
-    const y0 = Math.floor(footY / BS)
+    const y0 = Math.floor((footY + pad) / BS)
     const y1 = Math.floor((footY + BODY_H - pad) / BS)
     const z0 = Math.floor((z - BODY_R) / BS)
     const z1 = Math.floor((z + BODY_R - pad) / BS)
@@ -504,12 +511,32 @@ export function createOutsideWorld(): OutsideWorld {
   }
   const bodyBlocked = (x: number, footY: number, z: number) => {
     if (!inWorldXZ(x, z)) return true
-    if (solids.some((b) => circleHits(x, z, b))) return true
+    if (solids.some((b) => solidHits(x, footY, z, b))) return true
     return voxelsHit(x, footY, z)
   }
   const tryStep = (x: number, z: number, footY: number) => {
     if (bodyBlocked(x, footY, z)) return null
     return [x, z, footY] as const
+  }
+  const unstick = (x: number, footY: number, z: number) => {
+    if (!bodyBlocked(x, footY, z)) return [x, footY, z] as const
+    const top = surfaceY(x, z)
+    if (top + 0.02 !== footY && !bodyBlocked(x, top + 0.02, z)) return [x, top + 0.02, z] as const
+    const radii = [0.2, 0.35, 0.5, 0.7, 0.95, 1.2, 1.6]
+    const dirs: [number, number][] = [
+      [1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1],
+    ]
+    for (const r of radii) {
+      for (const [dx, dz] of dirs) {
+        const inv = Math.hypot(dx, dz)
+        const nx = x + (dx / inv) * r
+        const nz = z + (dz / inv) * r
+        const fy = groundUnder(nx, nz, footY + 0.4)
+        if (!bodyBlocked(nx, fy, nz)) return [nx, fy, nz] as const
+        if (!bodyBlocked(nx, footY, nz)) return [nx, footY, nz] as const
+      }
+    }
+    return [x, top, z] as const
   }
   const tryMove = (x: number, z: number, dx: number, dz: number, footY: number, canStep: boolean) => {
     const attempt = (nx: number, nz: number) => {
@@ -559,6 +586,13 @@ export function createOutsideWorld(): OutsideWorld {
     const dt = Math.min(0.05, walk.last ? (now - walk.last) / 1000 : 0)
     walk.last = now
     applyLook()
+    if (bodyBlocked(camera.position.x, walk.footY, camera.position.z)) {
+      const [ux, uy, uz] = unstick(camera.position.x, walk.footY, camera.position.z)
+      camera.position.x = ux
+      camera.position.z = uz
+      walk.footY = uy
+      walk.vy = 0
+    }
     let mx = 0
     let mz = 0
     if (walk.forward) mz -= 1
@@ -588,9 +622,9 @@ export function createOutsideWorld(): OutsideWorld {
     walk.vy -= GRAVITY * dt
     if (walk.vy < TERMINAL) walk.vy = TERMINAL
     let ny = walk.footY + walk.vy * dt
-    const ground = groundUnder(camera.position.x, camera.position.z, Math.max(walk.footY, ny) + 0.08)
+    const ground = groundUnder(camera.position.x, camera.position.z, walk.footY + 0.02)
     const ceil = ceilingAt(camera.position.x, camera.position.z, walk.footY + BODY_H * 0.35)
-    if (ny <= ground + 1e-4) {
+    if (walk.vy <= 0 && ny <= ground + 1e-4 && ground <= walk.footY + 1e-3) {
       ny = ground
       walk.vy = 0
       walk.grounded = true
