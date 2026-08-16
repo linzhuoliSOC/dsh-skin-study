@@ -18,8 +18,7 @@
     "NOTICE"
   ],
   "scripts": {
-    "build": "node scripts/build.mjs",
-    "dmg": "bash scripts/make-dmg.sh"
+    "build": "node scripts/build.mjs"
   },
   "dsh": {
     "bundle": {

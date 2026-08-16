@@ -2,53 +2,11 @@
 
 DeepSeek Harness Web 的 3D 书房皮肤：奶油墙、浅木家具、第一人称走动，出门是插件内的体素郊野。不依赖 `@linxin666/dsh-web-ui-all`，也不需要插画版皮肤。
 
-两种安装方式，选一种即可。
+当前只发布 **插件**。装进你已经在用的官方 DSH（CLI、源码，或官方自己的桌面包）即可。
 
 ---
 
-## 方式一：DMG（自带一份独立的 DSH）
-
-适合还没装官方 DSH，或想单独开一份「带书房」的 DSH。别人也可以再往这份里装别的插件。
-
-1. 下载本仓库 [Releases](https://github.com/linzhuoliSOC/dsh-skin-study/releases) 里的 `DSH-Study-0.1.0.dmg`，或用仓库里的 `dist/DSH-Study-0.1.0.dmg`。
-2. 打开 DMG，把 **DSH Study** 拖进「应用程序」。
-3. 第一次打开：按住 Control 点图标 →「打开」（未做 Apple 公证）。
-4. 本机需要 [Node.js 22+](https://nodejs.org/) 和网络。首次启动会用 `npx` 下载官方 `@deepseek-ai/dsh`，可能要一两分钟。
-5. 浏览器打开 [http://127.0.0.1:3180/](http://127.0.0.1:3180/)（故意不用 3080，以免和官方那份抢端口）。
-
-这份 App 的数据在：
-
-```text
-~/Library/Application Support/DSH Study/
-```
-
-和官方默认的 `~/.dsh` **完全分开**，互不影响。
-
-### 给这份 DMG 再装其他插件
-
-DMG 里有 **「安装其他插件.command」**，双击后填：
-
-```text
-github:用户名/仓库
-```
-
-或本机路径，例如 `/Users/你/某个插件`。
-
-也可以自己在终端执行：
-
-```sh
-export DSH_HOME="$HOME/Library/Application Support/DSH Study"
-export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
-npx --yes @deepseek-ai/dsh plugin --profile web add github:用户名/仓库
-```
-
-装完刷新浏览器即可。
-
----
-
-## 方式二：只当插件，装进已有的官方 DSH
-
-适合已经在用官方 CLI、官方 DMG、或 `npx @deepseek-ai/dsh web` 的人。书房会进你现有的 `web` profile。
+## 安装（插件）
 
 ```sh
 git clone https://github.com/linzhuoliSOC/dsh-skin-study.git
@@ -87,24 +45,18 @@ npx --yes @deepseek-ai/dsh plugin --profile web add "link:$PWD"
 
 | 要什么 | 谁提供 |
 |---|---|
-| DeepSeek Harness Web | 官方 CLI / 官方 DMG / 本仓库 DMG 首次启动下载 |
+| DeepSeek Harness Web | 你已有的官方安装 |
 | 浏览器 WebGL | 系统自带，不是插件 |
 | 其它皮肤、全家桶、插画版 | **不要** |
 
 ---
 
-## 自己打 DMG
+## TODO：自包含 DMG
 
-在 macOS 上：
-
-```sh
-bash scripts/make-dmg.sh
-```
-
-产物：`dist/DSH-Study-0.1.0.dmg`。改皮肤源码后先 `npm run build`（需要本机有一份 DSH 源码或 esbuild），再打 DMG。
+真正有意义的 DMG 应是 **整份可双击运行的 DSH**（运行时、官方 web、书房皮肤打在一起），用户不用先装 Node，也不用 `npx` 再拉官方包。现在还没有做到这一步，**先不发布 DMG**。草稿和缺口见 [desktop/TODO.md](desktop/TODO.md)。
 
 ---
 
 ## 许可
 
-皮肤本身是 Apache-2.0。DMG 启动器会在运行时下载官方 DeepSeek Harness（MIT，DeepSeek），不把官方程序打进镜像。
+Apache-2.0。

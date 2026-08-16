@@ -4,5 +4,6 @@ node_modules/
 desktop/stage/
 desktop/icon.iconset/
 desktop/icon.png
+dist/
 .idea/
 .vscode/

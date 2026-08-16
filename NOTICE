@@ -2,10 +2,7 @@ dsh-skin-study
 Copyright 2026 linzhuoliSOC
 
 This product includes software developed independently of DeepSeek.
-The optional macOS app launches the official DeepSeek Harness CLI
-(@deepseek-ai/dsh) at runtime; that software is MIT-licensed by DeepSeek
-and is downloaded from npm on first launch. It is not redistributed inside
-the DMG.
+A self-contained macOS DMG is not shipped yet.
 
 three.js is bundled into lib/client.js and remains MIT-licensed
 by the three.js authors.

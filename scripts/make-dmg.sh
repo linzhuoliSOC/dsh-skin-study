@@ -1,4 +1,6 @@
 #!/bin/bash
+# 未完成：目前只打启动器壳，还要本机 Node / npx。不要当发行物。
+# 见 desktop/TODO.md。
 # 把插件打进 DSH Study.app，再压成 UDZO DMG。
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
