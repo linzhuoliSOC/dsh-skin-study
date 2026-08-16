@@ -1,0 +1,13 @@
+{
+  "id": "study",
+  "name": "质感书房",
+  "nameEn": "Cozy Study",
+  "author": "llz · kimi3",
+  "tagline": "居家质感书房 · 温馨淡雅 · 区域拼合成一幅3D大图",
+  "description": "以居家书房为灵感的 DSH Web UI 皮肤：奶白与胡桃木的温馨色调，sidebar=书架墙、对话区=书桌、右侧面板=窗边一角，各区域拼合成一幅有纵深感的大图，同时保留清晰的区域边界。",
+  "tags": ["home", "study", "warm", "wood", "cozy", "minimal"],
+  "accent": "#b08d5f",
+  "bodyAttr": "data-dsh-study",
+  "package": "dsh-skin-study",
+  "order": 99
+}

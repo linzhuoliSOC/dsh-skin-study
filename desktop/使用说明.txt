@@ -1,0 +1,15 @@
+质感书房 / DSH Study
+====================
+
+1. 把「DSH Study」拖到「应用程序」。
+2. 第一次：Control-点击图标 → 打开。
+3. 需要 Node.js 22+（https://nodejs.org）。首次启动会下载官方 DeepSeek Harness。
+4. 浏览器打开 http://127.0.0.1:3180/
+
+再装其他插件：双击「安装其他插件.command」，填 github:用户/仓库 或本机路径。
+
+这份 DSH 的数据在：
+  ~/Library/Application Support/DSH Study/
+不会改你原来的 ~/.dsh。
+
+只想把书房装进已经在用的官方 DSH：不要用这个 DMG，去 GitHub 按 README 的「方式二」。

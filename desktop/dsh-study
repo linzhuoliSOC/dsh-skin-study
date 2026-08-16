@@ -1,0 +1,106 @@
+#!/bin/bash
+# DSH Study.app 入口：独立 DSH_HOME + 预装质感书房，再启动官方 dsh web。
+set -u
+export PATH="/opt/homebrew/bin:/usr/local/bin:$HOME/.local/bin:$HOME/.dsh/bin:$PATH"
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+RES="$ROOT/Resources"
+PLUGIN_SRC="$RES/plugin"
+export DSH_HOME="${DSH_HOME:-$HOME/Library/Application Support/DSH Study}"
+PORT="${DSH_STUDY_PORT:-3180}"
+LOG="$DSH_HOME/launch.log"
+PLUGIN_DST="$DSH_HOME/plugins/dsh-skin-study"
+URL="http://127.0.0.1:${PORT}/"
+
+mkdir -p "$DSH_HOME/plugins"
+exec >>"$LOG" 2>&1
+echo "---- $(date) ----"
+
+notify() {
+  /usr/bin/osascript -e "display notification \"$1\" with title \"质感书房\"" >/dev/null 2>&1 || true
+}
+
+alert() {
+  /usr/bin/osascript -e "display dialog \"$1\" buttons {\"好\"} default button 1 with title \"质感书房\"" >/dev/null 2>&1 || true
+}
+
+open_url() {
+  /usr/bin/open "$URL"
+}
+
+if ! command -v node >/dev/null 2>&1; then
+  /usr/bin/osascript <<'APPLESCRIPT' >/dev/null 2>&1 || true
+set choice to button returned of (display dialog "需要先安装 Node.js 22 或更高版本（nodejs.org 的 LTS）。" buttons {"打开 nodejs.org", "取消"} default button 1 with title "质感书房")
+if choice is "打开 nodejs.org" then open location "https://nodejs.org/"
+APPLESCRIPT
+  exit 1
+fi
+
+NODE_MAJOR="$(node -p "process.versions.node.split('.')[0]" 2>/dev/null || echo 0)"
+if [ "${NODE_MAJOR}" -lt 22 ]; then
+  alert "当前 Node 是 $(node -v)，需要 22 或更高。"
+  exit 1
+fi
+
+if ! command -v pnpm >/dev/null 2>&1; then
+  if command -v corepack >/dev/null 2>&1; then
+    corepack enable >/dev/null 2>&1 || true
+    corepack prepare pnpm@10.15.0 --activate >>"$LOG" 2>&1 || true
+  fi
+fi
+if ! command -v pnpm >/dev/null 2>&1; then
+  alert "需要 pnpm 才能安装 / 启动 DSH。终端执行：corepack enable && corepack prepare pnpm@10 --activate"
+  exit 1
+fi
+
+if [ ! -d "$PLUGIN_SRC" ]; then
+  alert "App 里缺少插件文件，请重新下载 DMG。"
+  exit 1
+fi
+
+rm -rf "$PLUGIN_DST"
+mkdir -p "$PLUGIN_DST"
+/usr/bin/ditto "$PLUGIN_SRC" "$PLUGIN_DST"
+
+if curl -sf "$URL" >/dev/null 2>&1; then
+  open_url
+  exit 0
+fi
+
+if [ ! -f "$DSH_HOME/profiles/web/package.json" ]; then
+  notify "首次启动：正在下载官方 DeepSeek Harness…"
+  npx --yes @deepseek-ai/dsh plugin --profile web add "link:${PLUGIN_DST}"
+  status=$?
+  if [ "$status" -ne 0 ]; then
+    alert "首次安装失败。请看日志：${LOG}"
+    exit "$status"
+  fi
+elif ! grep -q 'dsh-skin-study' "$DSH_HOME/profiles/web/package.json" 2>/dev/null; then
+  npx --yes @deepseek-ai/dsh plugin --profile web add "link:${PLUGIN_DST}" || true
+fi
+
+notify "正在打开质感书房…"
+npx --yes @deepseek-ai/dsh web --port "$PORT" &
+DSH_PID=$!
+
+ok=0
+for _ in $(seq 1 120); do
+  if curl -sf "$URL" >/dev/null 2>&1; then
+    ok=1
+    break
+  fi
+  if ! kill -0 "$DSH_PID" 2>/dev/null; then
+    break
+  fi
+  sleep 1
+done
+
+if [ "$ok" -eq 1 ]; then
+  open_url
+  wait "$DSH_PID"
+  exit $?
+fi
+
+alert "启动超时或进程退出。请看日志：${LOG}"
+wait "$DSH_PID" || true
+exit 1

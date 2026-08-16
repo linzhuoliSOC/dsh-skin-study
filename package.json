@@ -1,0 +1,56 @@
+{
+  "name": "dsh-skin-study",
+  "version": "0.1.0",
+  "description": "质感书房：DeepSeek Harness Web 的 3D 书房皮肤与门外体素世界。Cozy Study skin for DSH web.",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib",
+    "skin.json",
+    "cordis.patch.yml",
+    "README.md",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "dmg": "bash scripts/make-dmg.sh"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "inject": [],
+      "platform": "web"
+    }
+  },
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "skin",
+    "three",
+    "webgl"
+  ],
+  "author": "linzhuoliSOC",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/linzhuoliSOC/dsh-skin-study.git"
+  },
+  "bugs": {
+    "url": "https://github.com/linzhuoliSOC/dsh-skin-study/issues"
+  },
+  "homepage": "https://github.com/linzhuoliSOC/dsh-skin-study#readme",
+  "engines": {
+    "node": ">=22"
+  },
+  "devDependencies": {
+    "three": "^0.185.1"
+  }
+}
