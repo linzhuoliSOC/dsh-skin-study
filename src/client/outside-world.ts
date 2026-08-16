@@ -9,6 +9,7 @@ import type { WalkKey } from './study-3d'
 const EYE = 1.62
 const BODY_R = 0.3
 const BODY_H = 1.8
+const STEP_H = 0.51
 const WALK_SPEED = 4.4
 const SPRINT_SPEED = 7.0
 const LOOK_SENS = 0.0022
@@ -478,18 +479,49 @@ export function createOutsideWorld(): OutsideWorld {
     const nz = Math.min(box.z1, Math.max(box.z0, z))
     return (x - nx) * (x - nx) + (z - nz) * (z - nz) < BODY_R * BODY_R
   }
-  const blocked = (x: number, z: number) => {
+  const inWorldXZ = (x: number, z: number) => {
     const min = BS * 1.2
     const maxX = (W - 1.2) * BS
     const maxZ = (D - 1.2) * BS
-    if (x < min || z < min || x > maxX || z > maxZ) return true
-    return solids.some((b) => circleHits(x, z, b))
+    return x >= min && z >= min && x <= maxX && z <= maxZ
   }
-  const tryMove = (x: number, z: number, dx: number, dz: number) => {
-    if (!blocked(x + dx, z + dz)) return [x + dx, z + dz] as const
-    if (!blocked(x + dx, z)) return [x + dx, z] as const
-    if (!blocked(x, z + dz)) return [x, z + dz] as const
-    return [x, z] as const
+  const voxelsHit = (x: number, footY: number, z: number) => {
+    const pad = 1e-4
+    const x0 = Math.floor((x - BODY_R) / BS)
+    const x1 = Math.floor((x + BODY_R - pad) / BS)
+    const y0 = Math.floor(footY / BS)
+    const y1 = Math.floor((footY + BODY_H - pad) / BS)
+    const z0 = Math.floor((z - BODY_R) / BS)
+    const z1 = Math.floor((z + BODY_R - pad) / BS)
+    for (let gy = y0; gy <= y1; gy += 1) {
+      for (let gx = x0; gx <= x1; gx += 1) {
+        for (let gz = z0; gz <= z1; gz += 1) {
+          if (isSolid(gx, gy, gz)) return true
+        }
+      }
+    }
+    return false
+  }
+  const bodyBlocked = (x: number, footY: number, z: number) => {
+    if (!inWorldXZ(x, z)) return true
+    if (solids.some((b) => circleHits(x, z, b))) return true
+    return voxelsHit(x, footY, z)
+  }
+  const tryStep = (x: number, z: number, footY: number) => {
+    if (bodyBlocked(x, footY, z)) return null
+    return [x, z, footY] as const
+  }
+  const tryMove = (x: number, z: number, dx: number, dz: number, footY: number, canStep: boolean) => {
+    const attempt = (nx: number, nz: number) => {
+      const flat = tryStep(nx, nz, footY)
+      if (flat) return flat
+      if (!canStep) return null
+      if (bodyBlocked(nx, footY + STEP_H, nz)) return null
+      const g = groundUnder(nx, nz, footY + STEP_H + 0.08)
+      if (g <= footY + 1e-4 || g > footY + STEP_H + 1e-3) return null
+      return tryStep(nx, nz, g)
+    }
+    return attempt(x + dx, z + dz) ?? attempt(x + dx, z) ?? attempt(x, z + dz) ?? [x, z, footY] as const
   }
 
   const walk = {
@@ -542,13 +574,12 @@ export function createOutsideWorld(): OutsideWorld {
       const cos = Math.cos(walk.yaw)
       const dx = (mx * cos + mz * sin) * speed
       const dz = (-mx * sin + mz * cos) * speed
-      const [nx, nz] = tryMove(camera.position.x, camera.position.z, dx, dz)
+      const [nx, nz, fy] = tryMove(
+        camera.position.x, camera.position.z, dx, dz, walk.footY, walk.grounded,
+      )
       camera.position.x = nx
       camera.position.z = nz
-    }
-    if (walk.grounded) {
-      const step = groundUnder(camera.position.x, camera.position.z, walk.footY + 0.56)
-      if (step > walk.footY && step <= walk.footY + 0.56) walk.footY = step
+      walk.footY = fy
     }
     if (walk.jump && walk.grounded) {
       walk.vy = JUMP_VEL
