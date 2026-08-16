@@ -1,4 +1,4 @@
-# DeepSeek Harness 书房 / dsh-skin-study
+# DeepSeek Harness 3D书房 / dsh-skin-study
 
 DeepSeek Harness Web 的 3D 书房皮肤：奶油墙、浅木家具、第一人称走动，可出书房探索。
 
