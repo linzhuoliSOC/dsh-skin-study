@@ -346,6 +346,7 @@ export function buildStudyScene(): StudyScene {
 
   /* ---- 窗户：天空、太阳/月亮、窗框、窗棂、窗台 ---- */
   const sky = new THREE.Mesh(new THREE.PlaneGeometry(winW + 1.6, winTop - sillY + 1.2), basic('sky'))
+  sky.userData.hotspot = 'window'
   sky.position.set(winX, (sillY + winTop) / 2, -D / 2 - 0.35)
   scene.add(sky)
   const sunDisc = new THREE.Mesh(new THREE.CircleGeometry(0.32, 24), basic('sunDisc'))
@@ -354,12 +355,15 @@ export function buildStudyScene(): StudyScene {
 
   const frameMat = mat('frame', { roughness: 0.6 })
   const fT = 0.07, fD = 0.18
-  box(winW + fT * 2, fT, fD, frameMat, winX, sillY, -D / 2, false) // 下框
-  box(winW + fT * 2, fT, fD, frameMat, winX, winTop, -D / 2, false) // 上框
-  box(fT, winTop - sillY, fD, frameMat, winL, (sillY + winTop) / 2, -D / 2, false)
-  box(fT, winTop - sillY, fD, frameMat, winR, (sillY + winTop) / 2, -D / 2, false)
-  box(0.045, winTop - sillY, 0.06, frameMat, winX, (sillY + winTop) / 2, -D / 2, false) // 竖棂
-  box(winW, 0.045, 0.06, frameMat, winX, (sillY + winTop) / 2, -D / 2, false) // 横棂
+  const winParts = [
+    box(winW + fT * 2, fT, fD, frameMat, winX, sillY, -D / 2, false), // 下框
+    box(winW + fT * 2, fT, fD, frameMat, winX, winTop, -D / 2, false), // 上框
+    box(fT, winTop - sillY, fD, frameMat, winL, (sillY + winTop) / 2, -D / 2, false),
+    box(fT, winTop - sillY, fD, frameMat, winR, (sillY + winTop) / 2, -D / 2, false),
+    box(0.045, winTop - sillY, 0.06, frameMat, winX, (sillY + winTop) / 2, -D / 2, false), // 竖棂
+    box(winW, 0.045, 0.06, frameMat, winX, (sillY + winTop) / 2, -D / 2, false), // 横棂
+  ]
+  for (const p of winParts) p.userData.hotspot = 'window'
   box(winW + 0.3, 0.06, 0.24, frameMat, winX, sillY - 0.03, -D / 2 + 0.06) // 窗台板
 
   /* ---- 书桌 + 台灯（暖光点光源）；整组标 hotspot=desk，供点击展开工作区 ---- */
@@ -394,12 +398,63 @@ export function buildStudyScene(): StudyScene {
   lampLight.position.set(lampX, 1.12, lampZ)
   desk.add(lampLight)
 
+  /* ---- 第十三轮：书桌摆设（茶杯/地球仪/便签本），各带可交互 hotspot ---- */
+  const deskTopY = 0.785
+  const deskItemMat = mat('celadon', { roughness: 0.35 })
+  // 茶杯：小杯 + 杯盖，摆桌左前（避开台灯下方）
+  const teaCup = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.035, 0.07, 12), deskItemMat)
+  teaCup.position.set(1.35, deskTopY + 0.035, -3.15)
+  teaCup.userData.hotspot = 'tea'
+  teaCup.castShadow = true
+  desk.add(teaCup)
+  const teaLid = new THREE.Mesh(new THREE.SphereGeometry(0.035, 10, 8), deskItemMat)
+  teaLid.scale.set(0.9, 0.5, 0.9)
+  teaLid.position.set(1.35, deskTopY + 0.085, -3.15)
+  teaLid.userData.hotspot = 'tea'
+  desk.add(teaLid)
+  // 地球仪：球 + 半环轴 + 底座，摆桌中偏右
+  const globeBaseMat = mat('woodDark', { roughness: 0.6 })
+  const globeBase = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.085, 0.03, 14), globeBaseMat)
+  globeBase.position.set(1.85, deskTopY + 0.015, -3.6)
+  globeBase.userData.hotspot = 'globe'
+  desk.add(globeBase)
+  const globeMat = new THREE.MeshStandardMaterial({ color: 0x7fa6c8, roughness: 0.5, metalness: 0.05 })
+  themedMats.push({ m: globeMat, k: 'hemiSky' }) // 随主题微调（hemiSky 亮色天蓝/暗色钢蓝）
+  const globe = new THREE.Mesh(new THREE.SphereGeometry(0.11, 16, 12), globeMat)
+  globe.scale.set(1, 1.05, 1)
+  globe.position.set(1.85, deskTopY + 0.12, -3.6)
+  globe.rotation.z = 0.4
+  globe.userData.hotspot = 'globe'
+  globe.castShadow = true
+  desk.add(globe)
+  globeBase.castShadow = true
+  const globeRing = new THREE.Mesh(new THREE.TorusGeometry(0.135, 0.008, 6, 20, Math.PI), globeBaseMat)
+  globeRing.rotation.x = Math.PI / 2
+  globeRing.position.set(1.85, deskTopY + 0.11, -3.6)
+  globeRing.userData.hotspot = 'globe'
+  desk.add(globeRing)
+  // 便签本：小纸堆 + 一张立起来的便签，摆桌右前
+  const noteMat = mat('paper', { roughness: 0.95 })
+  const notePadBase = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.02, 0.2), noteMat)
+  notePadBase.position.set(2.05, deskTopY + 0.01, -3.2)
+  notePadBase.userData.hotspot = 'notepad'
+  desk.add(notePadBase)
+  const noteUp = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.13, 0.012), noteMat)
+  noteUp.position.set(2.05, deskTopY + 0.02 + 0.065, -3.24)
+  noteUp.rotation.x = -0.22
+  noteUp.userData.hotspot = 'notepad'
+  noteUp.castShadow = true
+  desk.add(noteUp)
+
   /* ---- 书架（左墙）+ 彩色低饱和的书 ---- */
   const shelfMat = mat('shelfWood', { roughness: 0.75 })
   const shX = -W / 2 + 0.18, shW = 2.4, shH = 2.2, shD = 0.34, shZ = -0.6
-  box(0.03, shH, shW, shelfMat, -W / 2 + 0.015, shH / 2, shZ) // 背板
-  box(shD, shH, 0.05, shelfMat, shX, shH / 2, shZ - shW / 2) // 侧板
-  box(shD, shH, 0.05, shelfMat, shX, shH / 2, shZ + shW / 2)
+  const shBack = box(0.03, shH, shW, shelfMat, -W / 2 + 0.015, shH / 2, shZ) // 背板
+  shBack.userData.hotspot = 'shelf'
+  const shSideL = box(shD, shH, 0.05, shelfMat, shX, shH / 2, shZ - shW / 2) // 侧板
+  shSideL.userData.hotspot = 'shelf'
+  const shSideR = box(shD, shH, 0.05, shelfMat, shX, shH / 2, shZ + shW / 2)
+  shSideR.userData.hotspot = 'shelf'
   box(shD, 0.05, shW, shelfMat, shX, shH - 0.025, shZ) // 顶板
   box(shD, 0.05, shW, shelfMat, shX, 0.025, shZ) // 底板
   const shelfRows = [0.55, 1.1, 1.65]
@@ -417,6 +472,7 @@ export function buildStudyScene(): StudyScene {
         )
         book.position.set(shX, rowY + 0.02 + bh / 2, z + bw / 2)
         book.castShadow = true
+        book.userData.hotspot = 'shelf'
         scene.add(book)
       }
       z += bw + 0.015
@@ -470,6 +526,7 @@ export function buildStudyScene(): StudyScene {
   pillowB.rotation.set(-0.15, -0.15, -0.05)
   sofa.add(pillowB)
   sofa.traverse((o) => { if (o instanceof THREE.Mesh) { o.castShadow = true; o.receiveShadow = true } })
+  sofa.userData.hotspot = 'sofa'
   sofa.position.set(4.02, 0, 0.4)
   sofa.rotation.y = -Math.PI / 2
   scene.add(sofa)
@@ -548,16 +605,20 @@ export function buildStudyScene(): StudyScene {
   /* ---- 第八轮：书柜旁日式地台床（贴左墙、与书柜同侧排开，不挡巡航视线） ---- */
   const bedX = -3.85, bedZ = 2.2
   const bedFrameMat = mat('wood', { roughness: 0.75 })
-  box(1.15, 0.18, 2.1, bedFrameMat, bedX, 0.09, bedZ) // 地台床架
-  box(1.15, 0.5, 0.06, bedFrameMat, bedX, 0.43, bedZ - 1.08) // 床头板（靠书柜一端）
-  box(1.05, 0.14, 2.0, mat('bedding', { roughness: 0.95 }), bedX, 0.25, bedZ) // 米白床垫
-  box(1.08, 0.045, 1.15, mat('blanket', { roughness: 0.98 }), bedX, 0.345, bedZ + 0.42) // 薄被（床尾半边）
+  const bedParts = [
+    box(1.15, 0.18, 2.1, bedFrameMat, bedX, 0.09, bedZ), // 地台床架
+    box(1.15, 0.5, 0.06, bedFrameMat, bedX, 0.43, bedZ - 1.08), // 床头板（靠书柜一端）
+    box(1.05, 0.14, 2.0, mat('bedding', { roughness: 0.95 }), bedX, 0.25, bedZ), // 米白床垫
+    box(1.08, 0.045, 1.15, mat('blanket', { roughness: 0.98 }), bedX, 0.345, bedZ + 0.42), // 薄被（床尾半边）
+  ]
+  for (const p of bedParts) p.userData.hotspot = 'bed'
   for (const px of [-0.27, 0.27]) { // 两个枕头（床头并排放）
     const bedPillow = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.09, 0.26), mat('pillowB', { roughness: 0.95 }))
     bedPillow.position.set(bedX + px, 0.365, bedZ - 0.82)
     bedPillow.rotation.x = -0.12
     bedPillow.castShadow = true
     bedPillow.receiveShadow = true
+    bedPillow.userData.hotspot = 'bed'
     scene.add(bedPillow)
   }
 
@@ -661,6 +722,7 @@ export function buildStudyScene(): StudyScene {
   scroll.position.set(deskX, 2.0, -D / 2 + 0.09)
   scroll.castShadow = true
   scroll.receiveShadow = true
+  scroll.userData.hotspot = 'scroll'
   scene.add(scroll)
   const rodMat = mat('woodDark', { roughness: 0.6 })
   for (const ry of [2.0 + 0.68, 2.0 - 0.68]) { // 上下木轴头

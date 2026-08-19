@@ -1,7 +1,7 @@
 {
   "name": "dsh-skin-study",
   "version": "0.1.0",
-  "description": "DeepSeek Harness 3D 书房。Cozy Study skin for DSH web.",
+  "description": "质感书房：DeepSeek Harness Web 的 3D 书房皮肤与门外体素世界。Cozy Study skin for DSH web.",
   "type": "module",
   "main": "lib/index.js",
   "exports": {
@@ -18,7 +18,8 @@
     "NOTICE"
   ],
   "scripts": {
-    "build": "node scripts/build.mjs"
+    "build": "node scripts/build.mjs",
+    "smoke:fast-effort": "node scripts/smoke-fast-effort.mjs"
   },
   "dsh": {
     "bundle": {

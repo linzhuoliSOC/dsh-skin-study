@@ -30,6 +30,7 @@ import css from './study.css'
 import { STUDY_ART_DARK, STUDY_ART_LIGHT } from './study-art'
 import { createStudyRoom } from './study-3d'
 import { createOutsideWorld, OUTSIDE_HOTBAR, type OutsideWorld } from './outside-world'
+import { createGamepadBridge, type GamepadBridgeHandle } from './gamepad-input'
 
 /** Cordis 上下文的最小结构：本皮肤只用到 effect 的生命周期。 */
 interface SkinContext {
@@ -102,6 +103,10 @@ export function apply(ctx: SkinContext): void {
   body.dataset.dshStudy = ''
   try { localStorage.setItem('dsh.study.mode', '3d') } catch { /* ignore */ }
 
+  // 手柄桥初始化器：提升到 try 外声明，try 内赋值，调用处判空——
+  // 避免 3D 初始化失败（try 中途 throw）时 "initGamepad is not defined"。
+  let initGamepad: (() => void) | null = null
+
   // WebGL 失败时用内联图当背景，不白屏。
   body.style.setProperty('--dsh-study-art-light', toArtUrl(STUDY_ART_LIGHT))
   body.style.setProperty('--dsh-study-art-dark', toArtUrl(STUDY_ART_DARK))
@@ -153,6 +158,7 @@ export function apply(ctx: SkinContext): void {
   let ptrDownY = 0
   let world: 'study' | 'outside' = 'study'
   let outside: OutsideWorld | null = null
+  let gamepad: GamepadBridgeHandle | null = null
   let fadeEl: HTMLDivElement | null = null
   let crosshairEl: HTMLDivElement | null = null
   let toastEl: HTMLDivElement | null = null
@@ -164,6 +170,26 @@ export function apply(ctx: SkinContext): void {
   let doorLockUntil = 0
   let fading = false
   let ignoreHotspotUntil = 0
+
+  /* ---- 第十三轮：家具交互（模拟人生式）。desk/door 保持原有行为，其余家具触发 LLM 能力 ---- */
+  /** 可交互家具 id → 展示信息。desk/door 是原有导航行为，不在 LLM 交互范围内。 */
+  const FURNITURE: Record<string, { name: string; hint: string }> = {
+    window: { name: '窗户', hint: '看看窗外天气' },
+    sofa: { name: '沙发', hint: '泡点灵感' },
+    bed: { name: '小床', hint: '睡前复盘' },
+    shelf: { name: '书架', hint: '抽一本书' },
+    tea: { name: '茶杯', hint: '饮一盏茶' },
+    globe: { name: '地球仪', hint: '看看世界' },
+    notepad: { name: '便签', hint: '今日建议' },
+    scroll: { name: '卷轴', hint: '今日一帖' },
+    desk: { name: '书桌', hint: '打开工作区' },
+    door: { name: '房门', hint: '出门走走' },
+  }
+  let interactBusy = false // 单飞锁：请求中屏蔽其他家具交互
+  let interactionEl: HTMLDivElement | null = null // 当前正在生成的家具飘字
+  let interactionLayerEl: HTMLDivElement | null = null
+  const interactionTimers = new Set<number>()
+  let labelEl: HTMLDivElement | null = null // 准星下方的家具名牌
 
   /* ---- 用户设置：⚙ 按钮 + 浮层（纯 DOM），拖动即时生效并写 localStorage ---- */
   const opts = loadOpts()
@@ -418,6 +444,55 @@ export function apply(ctx: SkinContext): void {
       og.drawImage(src, 0, 0, out.width, out.height)
       return out
     }
+    /** 与屋外门提示同源的像素字，多行版本供家具回复使用。 */
+    const paintPixelParagraph = (text: string) => {
+      const scale = 2
+      const maxWidth = Math.max(120, Math.min(300, Math.floor(window.innerWidth * 0.78 / scale)))
+      const padX = 4
+      const lineHeight = 15
+      const measure = document.createElement('canvas').getContext('2d')
+      if (!measure) return null
+      const font = '11px "PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif'
+      measure.font = font
+      const lines: string[] = []
+      for (const paragraph of text.split('\n')) {
+        let line = ''
+        for (const char of Array.from(paragraph)) {
+          if (line && measure.measureText(line + char).width > maxWidth - padX * 2) {
+            lines.push(line)
+            line = char
+          } else {
+            line += char
+          }
+        }
+        if (line || paragraph === '') lines.push(line)
+      }
+      const width = Math.max(12, Math.ceil(Math.min(maxWidth, Math.max(...lines.map((line) => measure.measureText(line).width), 0) + padX * 2)))
+      const height = Math.max(lineHeight, lines.length * lineHeight + 2)
+      const src = document.createElement('canvas')
+      src.width = width
+      src.height = height
+      const g = src.getContext('2d')
+      if (!g) return null
+      g.font = font
+      g.textBaseline = 'top'
+      g.fillStyle = '#1a1008'
+      lines.forEach((line, i) => {
+        for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [1, 1]]) {
+          g.fillText(line, padX + dx, 1 + i * lineHeight + dy)
+        }
+      })
+      g.fillStyle = '#fff3c4'
+      lines.forEach((line, i) => g.fillText(line, padX, 1 + i * lineHeight))
+      const out = document.createElement('canvas')
+      out.width = width * scale
+      out.height = height * scale
+      const og = out.getContext('2d')
+      if (!og) return null
+      og.imageSmoothingEnabled = false
+      og.drawImage(src, 0, 0, out.width, out.height)
+      return out
+    }
     const showToast = (text: string) => {
       if (!toastEl) return
       toastEl.replaceChildren()
@@ -432,6 +507,123 @@ export function apply(ctx: SkinContext): void {
         toastEl?.removeAttribute('data-on')
         toastTimer = 0
       }, 2000)
+    }
+
+    /* ---- 第十三轮：家具交互飘字（非模态 DOM overlay，流式打字机） ---- */
+    labelEl = document.createElement('div')
+    labelEl.dataset.dshStudyLabel = ''
+    labelEl.dataset.skinChrome = 'furniture-label'
+    body.appendChild(labelEl)
+    interactionLayerEl = document.createElement('div')
+    interactionLayerEl.dataset.dshStudyInteractionLayer = ''
+    interactionLayerEl.dataset.skinChrome = 'interaction-layer'
+    body.appendChild(interactionLayerEl)
+
+    /** 清掉指定飘字；其他仍在上浮的回复不受影响。 */
+    const removeInteraction = (panel: HTMLDivElement | null) => {
+      panel?.remove()
+      if (interactionEl === panel) interactionEl = null
+    }
+    /** 回复完成后用六秒向上漂移并淡出。 */
+    const scheduleInteractionFade = (panel: HTMLDivElement) => {
+      panel.dataset.floating = ''
+      const timer = window.setTimeout(() => {
+        interactionTimers.delete(timer)
+        removeInteraction(panel)
+      }, 6000)
+      interactionTimers.add(timer)
+    }
+    /** 开始一次家具交互：POST /dsh-skin-study/api/interact，读 NDJSON 流式渲染。 */
+    const startInteraction = async (id: string) => {
+      const f = FURNITURE[id]
+      if (!f) return
+      interactBusy = true
+      if (crosshairEl) crosshairEl.dataset.loading = ''
+      syncLabel(null)
+
+      // 飘字不接收鼠标/键盘事件，也不打断第一人称操作。
+      const panel = document.createElement('div')
+      panel.dataset.dshStudyInteraction = ''
+      panel.dataset.skinChrome = 'interaction'
+      panel.setAttribute('role', 'status')
+      panel.setAttribute('aria-live', 'polite')
+      const head = document.createElement('div')
+      head.dataset.dshStudyInteractionHead = ''
+      const title = document.createElement('span')
+      title.dataset.dshStudyInteractionTitle = ''
+      let currentTitle = f.name
+      const renderTitle = (text: string) => {
+        currentTitle = text
+        title.replaceChildren(paintPixelText(text) ?? text)
+      }
+      renderTitle(currentTitle)
+      head.append(title)
+      const bodyEl = document.createElement('div')
+      bodyEl.dataset.dshStudyInteractionBody = ''
+      const renderBody = (text: string) => {
+        bodyEl.replaceChildren(paintPixelParagraph(text) ?? text)
+        panel.setAttribute('aria-label', `${currentTitle}：${text}`)
+      }
+      renderBody('书房先生正在凝神……')
+      panel.append(head, bodyEl)
+      interactionLayerEl?.prepend(panel)
+      interactionEl = panel
+
+      let finalText = ''
+
+      try {
+        const res = await fetch('/dsh-skin-study/api/interact', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ id }),
+        })
+        if (!res.ok || !res.body) {
+          const text = await res.json().catch(() => ({}))
+          if ((text as { reason?: string }).reason === 'cooldown') {
+            showToast('书房先生刚回应过，稍等片刻')
+            removeInteraction(panel)
+          } else {
+            renderBody('书房先生没听到……' + ((text as { reason?: string }).reason ?? ''))
+          }
+          return
+        }
+        // NDJSON 流式读取
+        const reader = res.body.getReader()
+        const decoder = new TextDecoder()
+        let buf = ''
+        for (;;) {
+          const { done, value } = await reader.read()
+          if (done) break
+          buf += decoder.decode(value, { stream: true })
+          const lines = buf.split('\n')
+          buf = lines.pop() ?? ''
+          for (const line of lines) {
+            if (!line.trim()) continue
+            let cc: { type?: string; text?: string; title?: string }
+            try { cc = JSON.parse(line) } catch { continue }
+            if (cc.type === 'meta' && typeof cc.title === 'string') {
+              renderTitle(cc.title)
+            }
+            else if (cc.type === 'delta' && typeof cc.text === 'string') {
+              finalText += cc.text
+              renderBody(finalText)
+            } else if (cc.type === 'error' && typeof cc.text === 'string') {
+              renderBody((finalText ? finalText + '\n\n' : '') + `（书房先生说了句悄悄话：${cc.text}）`)
+            }
+          }
+        }
+        if (crosshairEl) delete crosshairEl.dataset.loading
+      } catch {
+        renderBody(finalText || '书房先生打了个盹，稍后再试试。')
+      } finally {
+        interactBusy = false
+        if (crosshairEl) delete crosshairEl.dataset.loading
+        if (interactionEl === panel) {
+          interactionEl = null
+          syncLabel(room?.pickHotspot(aimCenter().x, aimCenter().y) ?? null)
+          scheduleInteractionFade(panel)
+        }
+      }
     }
 
     const wait = (ms: number) => new Promise<void>((resolve) => { window.setTimeout(resolve, ms) })
@@ -467,6 +659,79 @@ export function apply(ctx: SkinContext): void {
       if (to === 'study') showWalkHint()
     }
 
+    // ---- 手柄桥：延迟初始化，故障隔离（独立 rAF，不影响 3D 渲染循环） ----
+    // tapCenter：书房内 A 键等效"点击画面中央"——与鼠标 up 判定一致。
+    const tapCenter = () => {
+      if (!room || !inWorld()) return
+      if (performance.now() < ignoreHotspotUntil) { lockLook(); return }
+      const c = aimCenter()
+      const hit = world === 'outside' && outside
+        ? outside.pickHotspot(c.x, c.y, room.renderer.domElement)
+        : room.pickHotspot(c.x, c.y)
+      if (hit === 'desk' && world === 'study') { setImmersed(false); return }
+      if (hit === 'door' && world === 'study') { void travel('outside'); return }
+      if (world === 'study' && hit && FURNITURE[hit] && hit !== 'desk' && hit !== 'door') {
+        if (interactBusy) { showToast('书房先生正在忙别的'); lockLook(); return }
+        void startInteraction(hit)
+        return
+      }
+      lockLook()
+    }
+    const cycleSlot = (dir: number) => {
+      const n = OUTSIDE_HOTBAR.length
+      if (n === 0) return
+      const cur = outside?.getSelected() ?? 0
+      const next = ((cur + dir) % n + n) % n
+      outside?.selectSlot(next)
+      paintHotbar()
+    }
+    initGamepad = () => {
+      try {
+        if (gamepad) gamepad.stop()
+        const b = createGamepadBridge()
+        b.setHooks({
+          onMoveKey: (key, down) => {
+            if (world === 'outside' && outside) outside.setMoveKey(key, down)
+            else room?.setMoveKey(key, down)
+          },
+          onLook: (dx, dy) => lookBy(dx, dy),
+          onAction: () => {
+            if (world === 'outside' && outside) {
+              const hit = outside.tryPunch()
+              if (hit === 'door') showToast('门没了你还想回去吗')
+              outside.setMining(true)
+              lockLook()
+            } else if (room && inWorld()) {
+              if (interactBusy) { showToast('书房先生正在忙别的'); return }
+              tapCenter()
+            }
+          },
+          onActionRelease: () => {
+            // A 松开：停止挖矿/放下，镜像鼠标 onCanvasUp 的行为
+            outside?.setMining(false)
+            outside?.setPlacing(false)
+          },
+          onBack: () => {
+            if (world === 'outside' && outside) {
+              outside.setMining(false)
+              outside.setPlacing(false)
+              void travel('study')
+            } else if (room && inWorld()) {
+              room.exitWalk()
+              setImmersed(false)
+            }
+          },
+          onSlotPrev: () => cycleSlot(-1),
+          onSlotNext: () => cycleSlot(1),
+        })
+        b.start()
+        gamepad = b
+      } catch (e) {
+        console.error('[dsh-skin-study] gamepad init failed:', e)
+        gamepad?.stop()
+        gamepad = null
+      }
+    }
     // 渲染循环：巡航按真实时间推进，所以限帧不会拖慢摆动。
     // 背景 30fps 足够慢镜头；漫游/走动/屋外 60fps。页面隐藏暂停。
     const CRUISE_MS = 1000 / 30
@@ -651,12 +916,31 @@ export function apply(ctx: SkinContext): void {
       if (!crosshairEl || !room) return
       if (world !== 'study' || !inWorld()) {
         delete crosshairEl.dataset.aim
+        syncLabel(null)
         return
       }
       const c = aimCenter()
       const hit = room.pickHotspot(c.x, c.y)
-      if (hit) crosshairEl.dataset.aim = hit
-      else delete crosshairEl.dataset.aim
+      if (hit) {
+        crosshairEl.dataset.aim = hit
+        syncLabel(hit)
+      } else {
+        delete crosshairEl.dataset.aim
+        syncLabel(null)
+      }
+    }
+    /** 准星下方家具名牌：命中可交互家具时显示中文名 + 提示。 */
+    const syncLabel = (hit: string | null) => {
+      if (!labelEl || interactBusy) {
+        if (labelEl && interactBusy) labelEl.removeAttribute('data-on')
+        return
+      }
+      if (hit && FURNITURE[hit]) {
+        labelEl.textContent = `${FURNITURE[hit].name} · ${FURNITURE[hit].hint}`
+        labelEl.dataset.on = ''
+      } else {
+        labelEl.removeAttribute('data-on')
+      }
     }
     const lockLook = () => {
       if (!inWorld()) return
@@ -702,6 +986,15 @@ export function apply(ctx: SkinContext): void {
       }
       if (hit === 'door' && world === 'study') {
         void travel('outside')
+        return
+      }
+      if (world === 'study' && hit && FURNITURE[hit] && hit !== 'desk' && hit !== 'door') {
+        if (interactBusy) {
+          showToast('书房先生正在忙别的')
+          lockLook()
+          return
+        }
+        void startInteraction(hit)
         return
       }
       lockLook()
@@ -878,6 +1171,10 @@ export function apply(ctx: SkinContext): void {
   // 初次套用：CSS 变量到 body（插画后备也生效），3D 就绪时同步 OrbitControls
   applyOpts()
 
+  // 手柄桥延迟启动：apply 同步路径跑完（3D 已建立）后再接，绝不阻塞/破坏 3D。
+  // initGamepad 可能因 3D 初始化异常而保持 null（try 内未赋值），此时跳过。
+  window.setTimeout(() => { try { initGamepad?.() } catch (e) { console.error('[dsh-skin-study] gamepad init:', e) } }, 0)
+
   ctx.effect(() => () => {
     document.removeEventListener('keydown', onSettingsKey)
     settingsBtn.removeEventListener('click', onSettingsBtn)
@@ -933,7 +1230,17 @@ export function apply(ctx: SkinContext): void {
     if (hintGoneTimer) { clearTimeout(hintGoneTimer); hintGoneTimer = 0 }
     hint?.remove()
     hint = null
+    labelEl?.remove()
+    labelEl = null
+    for (const timer of interactionTimers) clearTimeout(timer)
+    interactionTimers.clear()
+    interactionLayerEl?.remove()
+    interactionLayerEl = null
+    interactionEl = null
+    interactBusy = false
     observer?.disconnect()
+    gamepad?.stop()
+    gamepad = null
     room?.dispose()
     container?.remove()
     roamBtn?.remove()

@@ -908,3 +908,91 @@ body[data-dsh-study] [data-dsh-frame]{background-color:rgba(253,250,242,var(--ds
 body[data-dsh-study] [data-phase]{background-color:rgba(253,250,242,var(--dsh-skin-frame-alpha,.05))!important;backdrop-filter:blur(var(--dsh-skin-frame-blur,8px)) saturate(1.05);-webkit-backdrop-filter:blur(var(--dsh-skin-frame-blur,8px)) saturate(1.05)}
 body[data-dsh-study] [data-pane="conversation"],body[data-dsh-study] [data-conversation-scroll]{background:none!important}
 body[data-dsh-study][data-ds-dark-theme] [data-dsh-frame],body[data-dsh-study][data-ds-dark-theme] [data-phase]{background-color:rgba(35,29,22,var(--dsh-skin-frame-alpha,.12))!important}
+
+/* ---- 第十三轮：家具交互——准星名牌 + 我的世界风像素飘字 ---- */
+body[data-dsh-study] [data-dsh-study-label] {
+  position: fixed; left: 50%; top: calc(50% + 26px);
+  transform: translateX(-50%);
+  z-index: 1000002; pointer-events: none;
+  display: none;
+  box-sizing: border-box;
+  max-width: min(80vw, 420px);
+  padding: 6px 14px;
+  border-radius: 999px;
+  font: 12px/1.4 system-ui, -apple-system, sans-serif;
+  color: #4a3a24;
+  background: linear-gradient(#fff6dd, #f7e8c6);
+  border: 1px solid #cfa964;
+  box-shadow: 0 3px 10px #33260f55, inset 0 1px 0 #fff8
+}
+body[data-dsh-study] [data-dsh-study-label][data-on] {
+  display: block;
+  animation: dsh-label-in .22s ease;
+}
+body[data-dsh-study][data-ds-dark-theme] [data-dsh-study-label] {
+  color: #ecd9ae;
+  background: linear-gradient(#3a301f, #332a1b);
+  border-color: #6b5534;
+}
+@keyframes dsh-label-in {
+  from { opacity: 0; transform: translateX(-50%) translateY(6px); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+body[data-dsh-study] [data-dsh-study-crosshair][data-loading] {
+  animation: dsh-crosshair-spin 1s linear infinite;
+  opacity: .9;
+}
+@keyframes dsh-crosshair-spin {
+  0% { transform: translate(-50%, -50%) rotate(0deg); }
+  100% { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+body[data-dsh-study] [data-dsh-study-interaction-layer] {
+  position: fixed; left: 50%; bottom: 15vh;
+  transform: translateX(-50%);
+  z-index: 3000002;
+  width: min(82vw, 620px);
+  max-height: 72vh;
+  display: flex; flex-direction: column-reverse;
+  align-items: center;
+  gap: 10px;
+  overflow: hidden;
+  pointer-events: none;
+}
+body[data-dsh-study] [data-dsh-study-interaction] {
+  box-sizing: border-box;
+  width: 100%;
+  display: flex; flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  flex: none;
+  pointer-events: none;
+  user-select: none;
+  text-align: center;
+  animation: dsh-interaction-rise .32s ease-out both;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+body[data-dsh-study] [data-dsh-study-interaction-head] {
+  display: flex; align-items: center; justify-content: center;
+}
+body[data-dsh-study] [data-dsh-study-interaction] canvas {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+body[data-dsh-study] [data-dsh-study-interaction][data-floating] {
+  animation: dsh-interaction-float 6s linear forwards;
+}
+@keyframes dsh-interaction-rise {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes dsh-interaction-float {
+  0% { opacity: 1; transform: translateY(8px); }
+  62% { opacity: 1; transform: translateY(-42px); }
+  100% { opacity: 0; transform: translateY(-78px); }
+}
